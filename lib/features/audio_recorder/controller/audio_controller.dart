@@ -20,6 +20,7 @@ class AudioController extends StateNotifier<RecordingState> {
   final AudioRecorder _recorder = AudioRecorder();
   final AudioPlayer _player = AudioPlayer();
   final RecorderController recorderController = RecorderController();
+  UploadTask? uploadTask;
 
   String? _filePath;
 
@@ -27,8 +28,7 @@ class AudioController extends StateNotifier<RecordingState> {
 
   Future<String> _getFilePath() async {
     final Directory appDocumentsDir = await getApplicationDocumentsDirectory();
-    // _filePath = path.join(appDocumentsDir.absolute, 'voice_note.wav');
-    _filePath = '${appDocumentsDir.absolute}/voice_note.wav';
+    _filePath = path.join(appDocumentsDir.path, 'voice_note.wav');
     return _filePath!;
   }
   Future<void> startRecording() async {
@@ -70,22 +70,24 @@ class AudioController extends StateNotifier<RecordingState> {
     print('Tamaño del archivo: $fileSize bytes');
 
     try {
-      await storageRef.putFile(file);
+      uploadTask = storageRef.putFile(file);
+      // uploadTask!.snapshotEvents.listen((event) {
+      //   final progress = event.bytesTransferred / event.totalBytes;
+      //   state = state.copyWith(uploadProgress: progress);
+      // });
+
+    final snapshot = await uploadTask!.whenComplete(() {
+      print('Archivo subido correctamente');
+    });
+    final downloadUrl = await snapshot.ref.getDownloadURL();
+    print ('URL de descarga: $downloadUrl');
+    // state = state.copyWith(downloadUrl: downloadUrl, uploadProgress: null);
+
     } on firebase_core.FirebaseException catch (e) {
       print('Error al subir archivo: ${e.code} - ${e.message}');
     } catch (e) {
       print('Error inesperado: $e');
     }
-
-
-    // uploadTask.snapshotEvents.listen((event) {
-    //   final progress = event.bytesTransferred / event.totalBytes;
-    //   state = state.copyWith(uploadProgress: progress);
-    // });
-
-    // final snapshot = await uploadTask!.whenComplete(() {});
-    // final downloadUrl = await snapshot.ref.getDownloadURL();
-    // state = state.copyWith(downloadUrl: downloadUrl, uploadProgress: null);
   }
 
   Future<void> playAudio() async {

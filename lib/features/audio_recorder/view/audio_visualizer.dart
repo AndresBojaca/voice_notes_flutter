@@ -4,7 +4,7 @@ import 'package:audio_waveforms/audio_waveforms.dart';
 class AudioVisualizer extends StatelessWidget {
   final RecorderController recorderController;
 
-  AudioVisualizer({required this.recorderController});
+  const AudioVisualizer({super.key, required this.recorderController});
 
   @override
   Widget build(BuildContext context) {
