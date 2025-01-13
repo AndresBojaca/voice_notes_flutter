@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'audio_visualizer.dart';
+import 'package:audio_waveforms/audio_waveforms.dart';
 import '../../audio_recorder/controller/audio_controller.dart';
 
 class AudioScreen extends ConsumerWidget {
@@ -10,89 +10,132 @@ class AudioScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final audioState = ref.watch(audioControllerProvider);
     final audioController = ref.read(audioControllerProvider.notifier);
-    final controller = ref.read(recordingStateProvider.notifier);
 
     return Scaffold(
-      appBar: AppBar(title: Text('Voice Notes')),
+      appBar: AppBar(title: const Text('Voice Notes')),
       body: Center(
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.center,
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                shape: CircleBorder(),
-                padding: EdgeInsets.all(20),
+            // Visualizador de audio
+            audioState.isPlaying
+                ? AudioFileWaveforms(
+                    size: Size(MediaQuery.of(context).size.width, 100),
+                    playerController: audioController.playerController,
+                    playerWaveStyle: const PlayerWaveStyle(
+                      liveWaveColor: Colors.redAccent,
+                      showSeekLine: false,
+                      fixedWaveColor: Colors.grey,
+                    ),
+                    padding: const EdgeInsets.only(left: 18),
+                    margin: const EdgeInsets.symmetric(horizontal: 15),
+                  )
+                : AudioWaveforms(
+                    enableGesture: false,
+                    size: Size(MediaQuery.of(context).size.width, 100),
+                    recorderController: audioController.recorderController,
+                    waveStyle: const WaveStyle(
+                      waveColor: Colors.redAccent,
+                      extendWaveform: true,
+                      showMiddleLine: false,
+                    ),
+                    padding: const EdgeInsets.only(left: 18),
+                    margin: const EdgeInsets.symmetric(horizontal: 15),
+                  ),
+            // Temporizador de Grabación
+            Text(
+              audioState.recordingDuration,
+              style: const TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
               ),
-              onPressed: audioState.isRecording
-                  ? audioController.stopRecording
-                  : audioController.startRecording,
-              child: Icon(audioState.isRecording ? Icons.stop : Icons.mic,
-                  size: 40),
             ),
-            SizedBox(height: 16),
-            if (audioState.isRecording)
-              AudioVisualizer(
-                  recorderController: controller.recorderController),
-            SizedBox(height: 16),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                shape: CircleBorder(),
-                padding: EdgeInsets.all(20),
-              ),
-              onPressed: audioState.audioFile == null
-                  ? null
-                  : audioController.togglePlayPause,
-              child: Icon(
-                audioState.isPlaying ? Icons.pause : Icons.play_arrow,
-                size: 40,
-              ),
-            ),
-            SizedBox(height: 16),
-            Stack(
-              alignment: Alignment.center,
+            const SizedBox(height: 16),
+            // Botones en una fila
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Progress Circular como borde
+                // Botón de subida
+
+                Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    // Progreso Circular
+                    SizedBox(
+                      width: 60,
+                      height: 60,
+                      child: CircularProgressIndicator(
+                        value: audioState.uploadProgress ?? 0,
+                        strokeWidth: 8.0,
+                        valueColor:
+                            const AlwaysStoppedAnimation(Colors.deepPurple),
+                      ),
+                    ),
+                    // Botón
+                    SizedBox(
+                      width: 60,
+                      height: 60,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          shape: const CircleBorder(),
+                          padding: const EdgeInsets.all(12),
+                        ),
+                        onPressed: audioState.audioFile == null ||
+                                audioState.isRecording == true
+                            ? null
+                            : audioController.uploadAudio,
+                        child: const Icon(Icons.cloud_upload, size: 28),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(width: 16),
+                // Botón de grabación
                 SizedBox(
-                  width: 80,
-                  height: 80,
-                  child: CircularProgressIndicator(
-                    value: audioState.uploadProgress ?? 0,
-                    strokeWidth: 10.0,
-                    backgroundColor: Colors.transparent,
-                    valueColor: audioState.uploadProgress == null
-                        ? null
-                        : AlwaysStoppedAnimation(Colors.deepPurple),
+                  width: 60,
+                  height: 60,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      shape: const CircleBorder(),
+                      padding: const EdgeInsets.all(12),
+                    ),
+                    onPressed: audioState.isRecording
+                        ? audioController.stopRecording
+                        : audioController.startRecording,
+                    child: Icon(
+                      audioState.isRecording ? Icons.stop : Icons.circle,
+                      size: 28,
+                      color: audioState.isRecording
+                          ? Colors.deepPurple
+                          : Colors.red,
+                    ),
                   ),
                 ),
-                // Botón Elevado
+                const SizedBox(width: 16),
+                // Botón de reproducción
                 SizedBox(
-                  width: 80,
-                  height: 80,
+                  width: 60,
+                  height: 60,
                   child: ElevatedButton(
-                    onPressed: audioState.audioFile == null
-                        ? null
-                        : audioController.uploadAudio,
                     style: ElevatedButton.styleFrom(
-                      shape: CircleBorder(),
-                      padding: EdgeInsets.all(5),
+                      shape: const CircleBorder(),
+                      padding: const EdgeInsets.all(12),
                     ),
-                    child: Icon(Icons.cloud_upload, size: 40),
+                    onPressed: audioState.audioFile == null ||
+                            audioState.isRecording == true
+                        ? null
+                        : audioState.isPlaying
+                            ? audioController.pauseLocalAudio
+                            : audioController.playLocalAudio,
+                    child: Icon(
+                      audioState.isPlaying ? Icons.pause : Icons.play_arrow,
+                      size: 28,
+                    ),
                   ),
                 ),
               ],
             ),
-            SizedBox(height: 16),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                shape: CircleBorder(),
-                padding: EdgeInsets.all(20),
-              ),
-              onPressed: audioState.downloadUrl == null
-                  ? null
-                  : audioController.playAudio,
-              child: Icon(Icons.cloud_download, size: 40),
-            ),
+            const SizedBox(width: 16),
           ],
         ),
       ),

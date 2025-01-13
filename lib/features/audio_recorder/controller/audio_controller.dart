@@ -2,12 +2,11 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
+import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:just_audio/just_audio.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
-import 'package:record/record.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:audio_waveforms/audio_waveforms.dart';
 import 'package:firebase_core/firebase_core.dart' as firebase_core;
@@ -19,27 +18,18 @@ final recordingStateProvider =
 });
 
 class AudioController extends StateNotifier<RecordingState> {
-  final AudioRecorder _recorder = AudioRecorder();
-  final AudioPlayer _player = AudioPlayer();
   final RecorderController recorderController = RecorderController();
+  final PlayerController playerController = PlayerController();
+  Timer? _timer;
+  int _secondsElapsed = 0;
+
   UploadTask? uploadTask;
 
   String? _filePath;
 
   AudioController() : super(RecordingState()) {
-    // Escucha los cambios en el estado del reproductor
-    _player.playerStateStream.listen((playerState) {
-      final isPlaying = playerState.playing &&
-          playerState.processingState == ProcessingState.ready;
-      final isCompleted =
-          playerState.processingState == ProcessingState.completed;
-
-      if (isCompleted) {
-        _player.stop(); // Reiniciar al detenerse automáticamente
-        state = state.copyWith(isPlaying: false);
-      } else {
-        state = state.copyWith(isPlaying: isPlaying);
-      }
+    // Cuando se completa la reproducción, establecer isPlaying en false
+    playerController.onCompletion.listen((_) {
     });
   }
 
@@ -51,17 +41,27 @@ class AudioController extends StateNotifier<RecordingState> {
 
   Future<void> startRecording() async {
     final filePath = await _getFilePath();
-    if (await _recorder.hasPermission()) {
+    if (await recorderController.hasPermission) {
+      state = state.copyWith(isRecording: true, recordingDuration: "00:00");
+      // Inicia el temporizador
+      _secondsElapsed = 0;
+      _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+        _secondsElapsed++;
+        final minutes = (_secondsElapsed ~/ 60).toString().padLeft(2, '0');
+        final seconds = (_secondsElapsed % 60).toString().padLeft(2, '0');
+        state = state.copyWith(recordingDuration: "$minutes:$seconds");
+      });
+
       recorderController.reset();
-      await _recorder.start(const RecordConfig(), path: filePath);
+      recorderController.record(path: filePath);
+
       state = state.copyWith(isRecording: true);
     }
   }
 
   Future<void> stopRecording() async {
-    recorderController.stop();
-    final filePath = await _recorder.stop();
-    print('File path STOOPPP: $_filePath');
+    _timer?.cancel();
+    final filePath = await recorderController.stop();
     if (filePath != null) {
       final file = File(filePath);
       state = state.copyWith(isRecording: false, audioFile: file);
@@ -69,24 +69,28 @@ class AudioController extends StateNotifier<RecordingState> {
   }
 
   Future<void> playLocalAudio() async {
+
+    final fileLengthInDuration = await playerController.getDuration(DurationType.max);
+    final currentDuration = await playerController.getDuration(DurationType.current);
+
     if (state.audioFile == null) return;
+    playerController.stopPlayer();
     state = state.copyWith(audioFile: File(_filePath!));
-    await _player.setFilePath(_filePath!);
-    await _player.play();
-    state = state.copyWith(isPlaying: true);
+    await playerController.preparePlayer(
+      path: _filePath!,
+    );
+    playerController.startPlayer();
+    state = state.copyWith(isPlaying: true, isRecording: true, recordingDuration: "${currentDuration} / ${fileLengthInDuration}");
   }
 
-  Future<void> togglePlayPause() async {
-    if (state.audioFile == null) return;
-    if (_player.playing) {
-      await stopLocalAudio();
-    } else {
-      await playLocalAudio();
-    }
-  }
 
   Future<void> stopLocalAudio() async {
-    await _player.stop();
+    await playerController.stopPlayer();
+    state = state.copyWith(isPlaying: false);
+  }
+
+  Future<void> pauseLocalAudio() async {
+    await playerController.pausePlayer();
     state = state.copyWith(isPlaying: false);
   }
 
@@ -110,10 +114,10 @@ class AudioController extends StateNotifier<RecordingState> {
         state = state.copyWith(uploadProgress: currentProgress);
 
         //Despues de completar la carga y 1.5s, restablecer el progreso
-        if(state.uploadProgress == 1.0) {
-            Future.delayed(const Duration(milliseconds: 1500), () {
+        if (state.uploadProgress == 1.0) {
+          Future.delayed(const Duration(milliseconds: 1500), () {
             state = state.copyWith(uploadProgress: 0);
-            });
+          });
         }
       });
 
@@ -129,16 +133,22 @@ class AudioController extends StateNotifier<RecordingState> {
     }
   }
 
-  Future<void> playAudio() async {
-    if (state.downloadUrl == null) return;
-    await _player.setUrl(state.downloadUrl!);
-    _player.play();
-    state = state.copyWith(isPlaying: true);
-  }
+  // Future<void> playAudio() async {
+  //   if (state.downloadUrl == null) return;
+  //   await _player.setUrl(state.downloadUrl!);
+  //   _player.play();
+  //   state = state.copyWith(isPlaying: true);
+  // }
 
   Future<void> stopAudio() async {
-    await _player.stop();
     state = state.copyWith(isPlaying: false);
+  }
+
+  @override
+  void dispose() {
+    recorderController.dispose();
+    playerController.dispose();
+    super.dispose();
   }
 }
 

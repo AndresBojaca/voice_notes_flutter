@@ -37,9 +37,7 @@ dependencies:
   firebase_core: ^3.10.0
   firebase_storage: ^12.4.0
   permission_handler: ^11.0.0
-  record: ^5.2.0
   path_provider: ^2.0.11
-  just_audio: ^0.9.0
   cupertino_icons: ^1.0.8
   path: ^1.9.0
   audio_waveforms: ^1.2.0

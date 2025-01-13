@@ -6,6 +6,7 @@ class RecordingState {
   final File? audioFile;
   final double? uploadProgress;
   final String? downloadUrl;
+  final String recordingDuration;
 
   RecordingState({
     this.isRecording = false,
@@ -13,6 +14,7 @@ class RecordingState {
     this.audioFile,
     this.uploadProgress,
     this.downloadUrl,
+    this.recordingDuration = "00:00", // Formato inicial
   });
 
   RecordingState copyWith({
@@ -21,6 +23,7 @@ class RecordingState {
     File? audioFile,
     double? uploadProgress,
     String? downloadUrl,
+    String? recordingDuration,
   }) {
     return RecordingState(
       isRecording: isRecording ?? this.isRecording,
@@ -28,6 +31,7 @@ class RecordingState {
       audioFile: audioFile ?? this.audioFile,
       uploadProgress: uploadProgress ?? this.uploadProgress,
       downloadUrl: downloadUrl ?? this.downloadUrl,
+      recordingDuration: recordingDuration ?? this.recordingDuration,
     );
   }
 }
