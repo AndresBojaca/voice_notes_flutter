@@ -20,36 +20,36 @@ class AudioScreen extends ConsumerWidget {
             // Visualizador de audio
             audioState.isPlaying
                 ? AudioFileWaveforms(
+                    enableSeekGesture: true,
+                    continuousWaveform: true,
                     size: Size(MediaQuery.of(context).size.width, 100),
                     playerController: audioController.playerController,
                     playerWaveStyle: const PlayerWaveStyle(
-                      liveWaveColor: Colors.redAccent,
+                      liveWaveColor: Colors.deepPurple,
                       showSeekLine: false,
                       fixedWaveColor: Colors.grey,
+                      scaleFactor: 200.0,
                     ),
                     padding: const EdgeInsets.only(left: 18),
                     margin: const EdgeInsets.symmetric(horizontal: 15),
                   )
                 : AudioWaveforms(
-                    enableGesture: false,
+                    enableGesture: true,
                     size: Size(MediaQuery.of(context).size.width, 100),
                     recorderController: audioController.recorderController,
                     waveStyle: const WaveStyle(
                       waveColor: Colors.redAccent,
-                      extendWaveform: true,
                       showMiddleLine: false,
+                      extendWaveform: true,
+                      scaleFactor: 180.0,
+                      spacing: 5,
+                      showTop: true,
+                      showBottom: true,
                     ),
                     padding: const EdgeInsets.only(left: 18),
                     margin: const EdgeInsets.symmetric(horizontal: 15),
+                    shouldCalculateScrolledPosition: true,
                   ),
-            // Temporizador de Grabación
-            Text(
-              audioState.recordingDuration,
-              style: const TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
             const SizedBox(height: 16),
             // Botones en una fila
             Row(
@@ -83,7 +83,7 @@ class AudioScreen extends ConsumerWidget {
                         onPressed: audioState.audioFile == null ||
                                 audioState.isRecording == true
                             ? null
-                            : audioController.uploadAudio,
+                            : () => audioController.uploadAudio(context),
                         child: const Icon(Icons.cloud_upload, size: 28),
                       ),
                     ),
@@ -99,9 +99,11 @@ class AudioScreen extends ConsumerWidget {
                       shape: const CircleBorder(),
                       padding: const EdgeInsets.all(12),
                     ),
-                    onPressed: audioState.isRecording
-                        ? audioController.stopRecording
-                        : audioController.startRecording,
+                    onPressed: audioState.isPlaying == true
+                        ? null
+                        : audioState.isRecording
+                            ? audioController.stopRecording
+                            : audioController.startRecording,
                     child: Icon(
                       audioState.isRecording ? Icons.stop : Icons.circle,
                       size: 28,
@@ -129,6 +131,69 @@ class AudioScreen extends ConsumerWidget {
                             : audioController.playLocalAudio,
                     child: Icon(
                       audioState.isPlaying ? Icons.pause : Icons.play_arrow,
+                      size: 28,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                SizedBox(
+                  width: 60,
+                  height: 60,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      shape: const CircleBorder(),
+                      padding: const EdgeInsets.all(12),
+                    ),
+                    onPressed: () async {
+                      final audioController =
+                          ref.read(audioControllerProvider.notifier);
+
+                      // Obtén la lista de grabaciones
+                      final List<String> audioFiles =
+                          await audioController.fetchAudioFiles();
+
+                      if (context.mounted) {
+                        showModalBottomSheet(
+                          context: context,
+                          builder: (context) {
+                            return audioFiles.isNotEmpty
+                                ? Center(
+                                    child: Padding(
+                                      padding: EdgeInsets.all(16.0),
+                                      child: Column(
+                                        children: [
+                                          Text('Grabaciones disponibles'),
+                                          SizedBox(height: 16),
+                                          Expanded(
+                                            child: ListView.builder(
+                                              itemCount: audioFiles.length,
+                                              itemBuilder: (context, index) {
+                                                return ListTile(
+                                                  leading: const Icon(Icons.audiotrack),
+                                                  title: Text(
+                                                    audioFiles[0],
+                                                  ),
+                                                );
+                                              },
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  )
+                                : Center(
+                                    child: Padding(
+                                      padding: EdgeInsets.all(16.0),
+                                      child: Text(
+                                          'No hay grabaciones disponibles'),
+                                    ),
+                                  );
+                          },
+                        );
+                      }
+                    },
+                    child: const Icon(
+                      Icons.list,
                       size: 28,
                     ),
                   ),
